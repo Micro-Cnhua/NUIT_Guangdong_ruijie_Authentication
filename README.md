@@ -1,4 +1,8 @@
-该项目参考并基于https://github.com/Turris-Babel/school_ruijie项目进行修改
+该项目参考并基于
+
+https://github.com/Turris-Babel/school_ruijie
+
+项目进行修改
 
 主要添加了service参数的选择，目前service参数用于区分学生和教师认证,再次感谢Turris-Babel的代码支持！
 
