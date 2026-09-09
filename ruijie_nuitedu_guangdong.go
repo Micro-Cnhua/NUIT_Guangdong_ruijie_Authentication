@@ -1,0 +1,366 @@
+package main
+
+import (
+	"bufio"
+	"flag"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+)
+
+const (
+	Timeout = 15 * time.Second
+)
+
+// 登录参数结构
+type LoginParams struct {
+	Username        string
+	Password        string
+	ServiceType     string
+	OperatorCode    string
+	PasswordEncrypt string
+}
+
+func main() {
+	username := flag.String("u", "", "认证用户名")
+	password := flag.String("p", "", "认证密码")
+	serviceType := flag.String("s", "default", "服务类型: default(学生) / Teacher(教师)")
+	operatorCode := flag.String("c", "", "运营商代码（可选）")
+	persistent := flag.Bool("e", false, "启用持久化登录模式")
+	manualURL := flag.String("m", "", "手动指定完整认证页面地址")
+	help := flag.Bool("h", false, "显示帮助信息")
+
+	flag.Parse()
+
+	if *help || (*username == "" && *password == "") {
+		fmt.Println("锐捷校园网认证客户端")
+		fmt.Println("")
+		fmt.Println("用法: ruijie.exe [选项]")
+		fmt.Println("")
+		fmt.Println("选项:")
+		fmt.Println("  -u string    认证用户名")
+		fmt.Println("  -p string    认证密码")
+		fmt.Println("  -s string    服务类型: default(学生) / Teacher(教师)")
+		fmt.Println("  -c string    运营商代码（可选）")
+		fmt.Println("  -m string    完整认证页面地址（如: http://172.17.211.2/eportal/index.jsp?wlanuserip=...）")
+		fmt.Println("  -e           启用持久化登录模式")
+		fmt.Println("  -h           显示此帮助信息")
+		fmt.Println("")
+		fmt.Println("示例:")
+		fmt.Println("  ruijie.exe -u 学号 -p 密码 -m \"http://172.17.211.2/eportal/index.jsp?wlanuserip=...\"")
+		fmt.Println("  ruijie.exe -u 学号 -p 密码 -s Teacher -m \"http://172.17.211.2/eportal/index.jsp?wlanuserip=...\"")
+		os.Exit(0)
+	}
+
+	params := LoginParams{
+		Username:        *username,
+		Password:        *password,
+		ServiceType:     *serviceType,
+		OperatorCode:    *operatorCode,
+		PasswordEncrypt: "false",
+	}
+
+	fmt.Printf("📡 锐捷认证客户端启动\n")
+	fmt.Printf("👤 用户名: %s\n", params.Username)
+	fmt.Printf("🏷️  身份类型: %s\n", params.ServiceType)
+
+	var loginURL string
+	if *manualURL != "" {
+		loginURL = *manualURL
+		fmt.Printf("🔗 使用手动指定的完整认证地址\n")
+	} else {
+		// 尝试自动获取
+		fmt.Println("🔍 尝试自动获取认证地址...")
+		loginURL = getLoginURL()
+		if loginURL == "" {
+			fmt.Println("⚠️ 自动获取失败，请输入完整认证地址")
+			fmt.Println("（可以在浏览器中打开认证页面，复制地址栏URL）")
+			fmt.Print("👉 请输入认证地址: ")
+			reader := bufio.NewReader(os.Stdin)
+			input, _ := reader.ReadString('\n')
+			loginURL = strings.TrimSpace(input)
+			if loginURL == "" {
+				fmt.Println("❌ 未输入认证地址，程序退出")
+				return
+			}
+		}
+	}
+
+	fmt.Printf("🔗 认证地址: %s\n", loginURL)
+
+	// 从URL中提取queryString
+	queryString := extractQueryStringFromURL(loginURL)
+	if queryString == "" {
+		fmt.Println("⚠️ 未能从URL中提取queryString")
+		fmt.Println("请确保URL包含 wlanuserip 等参数")
+	} else {
+		fmt.Printf("📋 提取到queryString (长度: %d)\n", len(queryString))
+	}
+
+	// 构建POST数据
+	formData := url.Values{}
+	formData.Set("userId", params.Username)
+	formData.Set("password", params.Password)
+	formData.Set("service", params.ServiceType)
+	formData.Set("queryString", queryString)
+	formData.Set("operatorPwd", params.OperatorCode)
+	formData.Set("operatorUserId", params.OperatorCode)
+	formData.Set("validcode", "")
+	formData.Set("passwordEncrypt", params.PasswordEncrypt)
+
+	if *persistent {
+		fmt.Println("🔄 持久化模式已开启，每10秒检测一次")
+		for {
+			if !checkNetwork(loginURL) {
+				fmt.Println("🔗 网络已断开，尝试重新认证...")
+				doLogin(loginURL, formData)
+			} else {
+				fmt.Println("✅ 网络连接正常")
+			}
+			time.Sleep(10 * time.Second)
+		}
+	} else {
+		if !checkNetwork(loginURL) {
+			doLogin(loginURL, formData)
+		} else {
+			fmt.Println("✅ 已联网，无需认证")
+		}
+	}
+}
+
+// 执行登录认证
+func doLogin(loginURL string, formData url.Values) {
+	fmt.Println("🔄 正在尝试认证...")
+
+	// 构建完整的目标URL
+	// 通常认证接口是 index.jsp 或者 InterFace.do
+	targetURL := loginURL
+	
+	// 如果URL包含?，尝试提取基础路径，然后使用InterFace.do
+	if strings.Contains(loginURL, "?") {
+		baseURL := loginURL[:strings.Index(loginURL, "?")]
+		// 尝试使用InterFace.do
+		if strings.Contains(baseURL, "eportal/") {
+			// 替换为InterFace.do
+			if strings.HasSuffix(baseURL, "index.jsp") {
+				targetURL = strings.Replace(baseURL, "index.jsp", "InterFace.do", 1)
+				targetURL += "?method=login"
+			} else {
+				targetURL = baseURL + "/InterFace.do?method=login"
+			}
+		}
+	}
+
+	fmt.Printf("🎯 认证请求URL: %s\n", targetURL)
+	fmt.Printf("📤 发送POST数据...\n")
+
+	client := &http.Client{Timeout: Timeout}
+	loginResp, err := client.Post(targetURL, "application/x-www-form-urlencoded", strings.NewReader(formData.Encode()))
+	if err != nil {
+		fmt.Printf("❌ 认证请求失败: %v\n", err)
+		return
+	}
+	defer loginResp.Body.Close()
+
+	body, err := ioutil.ReadAll(loginResp.Body)
+	if err != nil {
+		fmt.Printf("❌ 读取响应失败: %v\n", err)
+		return
+	}
+
+	bodyStr := string(body)
+	fmt.Printf("📥 响应状态: %d\n", loginResp.StatusCode)
+	
+	// 打印响应内容（前500字符用于调试）
+	fmt.Printf("📥 响应内容: %s\n", bodyStr[:min(500, len(bodyStr))])
+
+	// 判断认证结果
+	if loginResp.StatusCode == 200 {
+		if strings.Contains(bodyStr, `"result":"success"`) ||
+			strings.Contains(bodyStr, "登录成功") ||
+			strings.Contains(bodyStr, "认证成功") {
+			fmt.Println("✅ 认证成功！")
+		} else if strings.Contains(bodyStr, `"result":"fail"`) ||
+			strings.Contains(bodyStr, "失败") {
+			msg := extractErrorMessage(bodyStr)
+			fmt.Printf("❌ 认证失败: %s\n", msg)
+		} else {
+			// 有些成功响应可能只是简单的HTML
+			if strings.Contains(bodyStr, "上网") || strings.Contains(bodyStr, "已登录") {
+				fmt.Println("✅ 认证成功！")
+			} else {
+				fmt.Println("⚠️ 认证请求已提交，请检查是否能正常上网")
+				fmt.Println("如果无法上网，请检查:")
+				fmt.Println("  1. queryString是否完整")
+				fmt.Println("  2. 服务类型是否正确 (default/Teacher)")
+				fmt.Println("  3. 用户名密码是否正确")
+			}
+		}
+	} else {
+		fmt.Printf("❌ 认证请求失败 (HTTP %d)\n", loginResp.StatusCode)
+	}
+}
+
+// 检测网络状态 - 尝试访问认证页面
+func checkNetwork(loginURL string) bool {
+	client := &http.Client{
+		Timeout: Timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// 从loginURL中提取基础地址，用于检测
+	u, err := url.Parse(loginURL)
+	if err != nil {
+		return false
+	}
+	baseURL := u.Scheme + "://" + u.Host
+
+	// 尝试访问网关地址
+	resp, err := client.Get(baseURL)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	// 如果返回204或200且不是认证页面，认为已联网
+	if resp.StatusCode == 204 {
+		return true
+	}
+	if resp.StatusCode == 200 {
+		body, _ := ioutil.ReadAll(resp.Body)
+		bodyStr := string(body)
+		if !strings.Contains(bodyStr, "eportal") && !strings.Contains(bodyStr, "认证") {
+			return true
+		}
+	}
+	return false
+}
+
+// 获取认证页面地址（自动检测）
+func getLoginURL() string {
+	client := &http.Client{
+		Timeout: Timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// 尝试访问网关的IP
+	gatewayIPs := []string{
+		"http://172.17.211.2",
+		"http://10.0.0.1",
+		"http://192.168.1.1",
+	}
+
+	for _, ip := range gatewayIPs {
+		resp, err := client.Get(ip)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == 302 || resp.StatusCode == 301 {
+			loginURL := resp.Header.Get("Location")
+			if loginURL != "" && strings.Contains(loginURL, "eportal") {
+				return loginURL
+			}
+		}
+
+		if resp.StatusCode == 200 {
+			body, _ := ioutil.ReadAll(resp.Body)
+			bodyStr := string(body)
+			if strings.Contains(bodyStr, "eportal") {
+				// 提取form的action
+				re := regexp.MustCompile(`<form[^>]*action=["']([^"']+)["']`)
+				matches := re.FindStringSubmatch(bodyStr)
+				if len(matches) > 1 {
+					actionURL := matches[1]
+					if strings.HasPrefix(actionURL, "http") {
+						return actionURL
+					}
+					return ip + actionURL
+				}
+				return ip + "/eportal/index.jsp"
+			}
+		}
+	}
+	return ""
+}
+
+// 从URL中提取queryString
+func extractQueryStringFromURL(loginURL string) string {
+	// 方法1：从URL参数中提取
+	u, err := url.Parse(loginURL)
+	if err == nil {
+		q := u.Query()
+		if qs := q.Get("queryString"); qs != "" {
+			return qs
+		}
+		// 如果queryString参数不存在，说明所有参数都是queryString的一部分
+		// 检查是否有wlanuserip参数
+		if q.Get("wlanuserip") != "" {
+			// 重新构建queryString
+			params := url.Values{}
+			for key, values := range q {
+				if key != "queryString" {
+					for _, value := range values {
+						params.Add(key, value)
+					}
+				}
+			}
+			return params.Encode()
+		}
+	}
+
+	// 方法2：直接从URL字符串中提取
+	idx := strings.Index(loginURL, "?")
+	if idx != -1 {
+		queryPart := loginURL[idx+1:]
+		// 如果queryPart本身不包含queryString=，则整个queryPart就是queryString
+		if !strings.Contains(queryPart, "queryString=") {
+			return queryPart
+		}
+	}
+
+	// 方法3：正则提取
+	re := regexp.MustCompile(`queryString=([^&]+)`)
+	matches := re.FindStringSubmatch(loginURL)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+
+	return ""
+}
+
+// 提取错误信息
+func extractErrorMessage(body string) string {
+	// 尝试JSON格式
+	re := regexp.MustCompile(`"message":"([^"]+)"`)
+	matches := re.FindStringSubmatch(body)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	
+	// 尝试HTML格式
+	re2 := regexp.MustCompile(`<p[^>]*>([^<]+)</p>`)
+	matches2 := re2.FindStringSubmatch(body)
+	if len(matches2) > 1 {
+		return matches2[1]
+	}
+	
+	return "未知错误"
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
