@@ -39,3 +39,6 @@ https://github.com/Turris-Babel/school_ruijie
 
 # 持久化登录（每10秒检测一次）
 ./ruijie -u 学号 -p 密码 -m "认证页面URL" -e
+
+**Windows示例**
+ruijie_windows_amd64.exe -u 20240001 -p 123456 -m "http://172.17.211.2/eportal/index.jsp?wlanuserip=..."
