@@ -9,7 +9,7 @@ https://github.com/Turris-Babel/school_ruijie
 # 广东东软学院锐捷校园网认证辅助脚本 (Ruijie Portal Auth)
 一个用于锐捷校园网 ePortal Web 认证的命令行客户端，支持多平台运行，无需浏览器即可完成认证。
 注意！不保证其他学校相同的锐捷web认证是否能用，但是只要是下面这种认证页面就能直接用！
-![网页形式](https://raw.githubusercontent.com/Micro-Cnhua/Ruijie_Porta_Auth/refs/heads/main/%E5%B1%8F%E5%B9%95%E6%88%AA%E5%9B%BE%202026-09-09%20164324.png)
+![图片](./屏幕截图%202026-09-09%20164324.png)
 
 广东东软学院直接编译或者下载程序就能用！无需对代码进行修改！
 
