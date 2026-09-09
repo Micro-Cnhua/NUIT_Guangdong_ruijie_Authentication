@@ -22,15 +22,6 @@ https://github.com/Turris-Babel/school_ruijie
 
 ✅ 轻量高效：无依赖，单文件运行
 
-文件名	适用平台	架构
-ruijie_windows_amd64.exe	Windows	x86_64
-ruijie_linux_amd64	Linux	x86_64
-ruijie_macos_amd64	macOS	Intel
-ruijie_macos_arm64	macOS	Apple Silicon
-ruijie_linux_arm64	OpenWrt/树莓派	ARMv8 (64位)
-ruijie_linux_armv7	OpenWrt	ARMv7 (32位)
-🚀 快速开始
-基本用法
 bash
 # 学生身份登录（默认）
 ./ruijie -u 学号 -p 密码 -m "认证页面URL"
