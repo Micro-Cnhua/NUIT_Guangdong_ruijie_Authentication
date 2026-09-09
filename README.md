@@ -22,7 +22,6 @@ https://github.com/Turris-Babel/school_ruijie
 
 ✅ 轻量高效：无依赖，单文件运行
 
-bash
 # 学生身份登录（默认）
 ./ruijie -u 学号 -p 密码 -m "认证页面URL"
 
@@ -31,26 +30,38 @@ bash
 
 # 持久化登录（每10秒检测一次）
 ./ruijie -u 学号 -p 密码 -m "认证页面URL" -e
+
 Windows 示例
-cmd
+
 ruijie_windows_amd64.exe -u 20240001 -p 123456 -m "http://172.17.211.2/eportal/index.jsp?wlanuserip=..."
+
 Linux/OpenWrt 示例
-bash
+
 ./ruijie_linux_amd64 -u 20240001 -p 123456 -m "http://172.17.211.2/eportal/index.jsp?wlanuserip=..."
+
 macOS 示例
-bash
+
 ./ruijie_macos_amd64 -u 20240001 -p 123456 -m "http://172.17.211.2/eportal/index.jsp?wlanuserip=..."
 📋 命令行参数
 参数	说明	默认值	必需
 -u	认证用户名	-	✅ 是
+
 -p	认证密码	-	✅ 是
+
+
 -s	服务类型：default(学生) / Teacher(教师)	default	❌ 否
 -c	运营商代码	空	❌ 否
+
 -m	完整认证页面URL	-	⚠️ 自动检测失败时必需
+
 -e	启用持久化登录模式	false	❌ 否
+
 -h	显示帮助信息	-	❌ 否
+
 参数详解
+
 -m 认证页面URL
+
 这是最重要的参数。你可以通过以下方式获取：
 
 浏览器访问：在已连接校园网但未认证的设备上，打开浏览器访问任意网站，会自动跳转到认证页面
@@ -61,8 +72,8 @@ bash
 
 示例URL格式：
 
-text
 http://172.17.211.2/eportal/index.jsp?wlanuserip=1c654cb25b576d10...&wlanacname=...&ssid=&nasip=...&mac=...
+
 🔧 编译方法
 前提条件
 安装 Go 1.16 或更高版本
@@ -99,120 +110,36 @@ macOS (Apple Silicon) 编译
 bash
 GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_macos_arm64 main.go
 
-一键编译所有平台
-创建 build_all.sh：
 
-bash
-#!/bin/bash
-echo "========================================"
-echo "  锐捷认证客户端 - 多平台编译脚本"
-echo "========================================"
-
-# 清理旧文件
-rm -f ruijie_*
-
-# 编译 Windows x86_64
-echo "[1/7] 编译 Windows x86_64..."
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_windows_amd64.exe main.go
-
-# 编译 Linux x86_64
-echo "[2/7] 编译 Linux x86_64..."
-GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_linux_amd64 main.go
-
-# 编译 Linux ARMv8
-echo "[3/7] 编译 Linux ARMv8..."
-GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_linux_arm64 main.go
-
-# 编译 Linux ARMv7
-echo "[4/7] 编译 Linux ARMv7..."
-GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_linux_armv7 main.go
-
-# 编译 macOS Intel
-echo "[5/7] 编译 macOS Intel..."
-GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_macos_amd64 main.go
-
-# 编译 macOS Apple Silicon
-echo "[6/7] 编译 macOS Apple Silicon..."
-GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ruijie_macos_arm64 main.go
-
-echo ""
-echo "========================================"
-echo "  编译完成！生成文件："
-echo "========================================"
-ls -lh ruijie_*
-运行：
-
-bash
-chmod +x build_all.sh
-./build_all.sh
-Windows 一键编译脚本 build_all.bat
-batch
-@echo off
-chcp 65001 >nul
-echo ========================================
-echo  锐捷认证客户端 - 多平台编译脚本
-echo ========================================
-
-if exist ruijie_* del ruijie_*
-
-echo [1/6] 编译 Windows x86_64...
-set GOOS=windows&set GOARCH=amd64&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_windows_amd64.exe main.go
-
-echo [2/6] 编译 Linux x86_64...
-set GOOS=linux&set GOARCH=amd64&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_linux_amd64 main.go
-
-echo [3/6] 编译 Linux ARMv8...
-set GOOS=linux&set GOARCH=arm64&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_linux_arm64 main.go
-
-echo [4/6] 编译 Linux ARMv7...
-set GOOS=linux&set GOARCH=arm&set GOARM=7&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_linux_armv7 main.go
-
-echo [5/6] 编译 macOS Intel...
-set GOOS=darwin&set GOARCH=amd64&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_macos_amd64 main.go
-
-echo [6/6] 编译 macOS Apple Silicon...
-set GOOS=darwin&set GOARCH=arm64&set CGO_ENABLED=0
-go build -ldflags="-s -w" -o ruijie_macos_arm64 main.go
-
-echo.
-echo ========================================
-echo  编译完成！
-echo ========================================
-dir ruijie_*
-pause
 📱 平台部署指南
+
 OpenWrt 路由器部署
+
 1. 确定设备架构
-bash
+
 # SSH登录OpenWrt后执行
 uname -m
-
 # aarch64 -> 使用 ruijie_linux_arm64
 # armv7l   -> 使用 ruijie_linux_armv7
 # x86_64   -> 使用 ruijie_linux_amd64
+
 2. 上传文件
-bash
-# 使用 scp 上传（在电脑上执行）
-scp ruijie_linux_arm64 root@192.168.1.1:/root/
+
 3. 赋予执行权限并测试
-bash
+
 chmod +x /root/ruijie_linux_arm64
 /root/ruijie_linux_arm64 -h
+
 4. 设置开机自启
 创建 /etc/init.d/ruijie：
 
-bash
 #!/bin/sh /etc/rc.common
 
 START=99
 STOP=10
 
 # 请修改以下配置
+
 USERNAME="你的学号"
 PASSWORD="你的密码"
 SERVICE_TYPE="default"  # 或 Teacher
